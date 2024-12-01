@@ -1,3 +1,8 @@
+use day1::puzzle1;
+
+pub mod day1;
+
 fn main() {
-    println!("Hello, world!");
+    let result = puzzle1();
+    println!("{result}");
 }
