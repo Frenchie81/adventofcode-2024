@@ -1,27 +1,12 @@
-use std::fs;
+use crate::read_file;
 
-pub fn puzzle1() -> i64 {
-    let contents = read_file();
-    let mut left: Vec<i64> = Vec::new();
-    let mut right: Vec<i64> = Vec::new();
-    for line in contents.lines() {
-        let splits: Vec<&str> = line.split("   ").collect();
-        if splits.len() != 2 {
-            continue;
-        }
+use super::split_contents;
 
-        let value1: i64 = splits[0].parse().expect("value1 should be int");
-        let value2: i64 = splits[1].parse().expect("value2 should be int");
+pub fn solve_day1_puzzle1() -> i64 {
+    let contents = read_file("day1.txt");
+    let (left, right) = split_contents(contents);
 
-        left.push(value1);
-        right.push(value2);
-    }
     get_puzzle1_result(left, right)
-}
-
-fn read_file() -> String {
-    fs::read_to_string("/home/bfrench/projects/adventofcode-2024/inputs/day1_1.txt")
-        .expect("unable to read day 1 puzzle 1 file")
 }
 
 fn get_puzzle1_result(mut left: Vec<i64>, mut right: Vec<i64>) -> i64 {
