@@ -2,7 +2,7 @@ use std::{env, fs, path::Path};
 
 use day1::{puzzle1::solve_day1_puzzle1, puzzle2::solve_day1_puzzle2};
 use day2::{puzzle1::solve_day2_puzzle1, puzzle2::solve_day2_puzzle2};
-use day3::puzzle1::solve_day3_puzzle1;
+use day3::{puzzle1::solve_day3_puzzle1, puzzle2::solve_day3_puzzle2};
 
 pub mod day1;
 pub mod day2;
@@ -32,5 +32,8 @@ fn main() {
     println!("day2 puzzle1: {day2_puzzle2_result}");
 
     let day3_puzzle1_result = solve_day3_puzzle1();
-    println!("day2 puzzle1: {day3_puzzle1_result}");
+    println!("day3 puzzle1: {day3_puzzle1_result}");
+
+    let day3_puzzle2_result = solve_day3_puzzle2();
+    println!("day3 puzzle1: {day3_puzzle2_result}");
 }
