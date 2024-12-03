@@ -2,9 +2,11 @@ use std::{env, fs, path::Path};
 
 use day1::{puzzle1::solve_day1_puzzle1, puzzle2::solve_day1_puzzle2};
 use day2::{puzzle1::solve_day2_puzzle1, puzzle2::solve_day2_puzzle2};
+use day3::puzzle1::solve_day3_puzzle1;
 
 pub mod day1;
 pub mod day2;
+pub mod day3;
 
 fn read_file(file_name: &str) -> String {
     let input_path = env::var("INPUT_PATH").expect("INPUT_PATH environment variable must be set");
@@ -28,4 +30,7 @@ fn main() {
 
     let day2_puzzle2_result = solve_day2_puzzle2();
     println!("day2 puzzle1: {day2_puzzle2_result}");
+
+    let day3_puzzle1_result = solve_day3_puzzle1();
+    println!("day2 puzzle1: {day3_puzzle1_result}");
 }
