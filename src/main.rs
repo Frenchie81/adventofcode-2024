@@ -4,11 +4,13 @@ use day1::{puzzle1::solve_day1_puzzle1, puzzle2::solve_day1_puzzle2};
 use day2::{puzzle1::solve_day2_puzzle1, puzzle2::solve_day2_puzzle2};
 use day3::{puzzle1::solve_day3_puzzle1, puzzle2::solve_day3_puzzle2};
 use day4::{puzzle1::solve_day4_puzzle1, puzzle2::solve_day4_puzzle2};
+use day5::{puzzle1::solve_day5_puzzle1, puzzle2::solve_day5_puzzle2};
 
 pub mod day1;
 pub mod day2;
 pub mod day3;
 pub mod day4;
+pub mod day5;
 
 fn read_file(file_name: &str) -> String {
     let input_path = env::var("INPUT_PATH").expect("INPUT_PATH environment variable must be set");
@@ -44,4 +46,10 @@ fn main() {
 
     let day4_puzzle2_result = solve_day4_puzzle2();
     println!("day4 puzzle2: {day4_puzzle2_result}");
+
+    let day5_puzzle1_result = solve_day5_puzzle1();
+    println!("day5 puzzle1: {day5_puzzle1_result}");
+
+    let day5_puzzle2_result = solve_day5_puzzle2();
+    println!("day5 puzzle2: {day5_puzzle2_result}");
 }
