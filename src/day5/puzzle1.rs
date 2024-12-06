@@ -1,9 +1,6 @@
-use core::panic;
-use std::collections::{HashMap, HashSet};
-
 use crate::read_file;
 
-use super::{parse_content, RuleSet};
+use super::parse_content;
 
 pub fn solve_day5_puzzle1() -> i64 {
     let content = read_file("day5.txt");

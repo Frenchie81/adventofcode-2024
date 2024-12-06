@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use regex::NoExpand;
-
 use crate::read_file;
 
 use super::{parse_content, RuleSet};
