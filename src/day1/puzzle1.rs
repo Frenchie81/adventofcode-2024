@@ -39,12 +39,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn puzzle1_demo() {
+    fn demo() {
         let left: Vec<i64> = vec![3, 4, 2, 1, 3, 3];
         let right: Vec<i64> = vec![4, 3, 5, 3, 9, 3];
 
         let result = get_puzzle1_result(left, right);
 
         assert_eq!(11, result);
+    }
+
+    #[test]
+    fn file() {
+        dotenvy::dotenv().expect("should be able to load .env file!");
+
+        let result = solve_day1_puzzle1();
+
+        assert_eq!(1341714, result);
     }
 }

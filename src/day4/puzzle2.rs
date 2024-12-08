@@ -68,4 +68,13 @@ MXMXAXMASX";
 
         assert_eq!(9, result);
     }
+
+    #[test]
+    fn file() {
+        dotenvy::dotenv().expect("should be able to load .env file!");
+
+        let result = solve_day4_puzzle2();
+
+        assert_eq!(1875, result);
+    }
 }

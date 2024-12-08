@@ -45,4 +45,13 @@ mod tests {
 
         assert_eq!(41, result);
     }
+
+    #[test]
+    fn file() {
+        dotenvy::dotenv().expect("should be able to load .env file!");
+
+        let result = solve_day6_puzzle1();
+
+        assert_eq!(4374, result);
+    }
 }
