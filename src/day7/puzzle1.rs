@@ -11,7 +11,7 @@ fn get_result(content: &str) -> i64 {
 
     equations
         .iter()
-        .filter(|x| x.can_solve())
+        .filter(|x| x.can_solve(false))
         .map(|x| x.test_value)
         .sum()
 }

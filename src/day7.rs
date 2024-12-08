@@ -11,12 +11,26 @@ struct Equation {
 enum Operation {
     Add(i64),
     Multiply(i64),
+    Concat(i64),
 }
 
 impl Operation {
-    fn next(&self) -> Self {
+    fn next(&self, concat: bool) -> Self {
+        if concat {
+            return self.next_concat();
+        }
+
         match self {
             Operation::Add(i) => Operation::Multiply(*i),
+            Operation::Multiply(i) => Operation::Add(*i),
+            Operation::Concat(_) => *self,
+        }
+    }
+
+    fn next_concat(&self) -> Self {
+        match self {
+            Operation::Add(i) => Operation::Concat(*i),
+            Operation::Concat(i) => Operation::Multiply(*i),
             Operation::Multiply(i) => Operation::Add(*i),
         }
     }
@@ -41,7 +55,7 @@ impl Equation {
         Self { test_value, values }
     }
 
-    fn can_solve(&self) -> bool {
+    fn can_solve(&self, concat: bool) -> bool {
         let values_len = self.values.len();
         let value = self
             .values
@@ -62,6 +76,16 @@ impl Equation {
                 answer = match o {
                     Operation::Add(i) => answer + i,
                     Operation::Multiply(i) => answer * i,
+                    Operation::Concat(i) => {
+                        if !concat {
+                            answer
+                        } else {
+                            let answer_string = answer.to_string() + i.to_string().as_str();
+                            answer_string
+                                .parse::<i64>()
+                                .expect("should always be a number")
+                        }
+                    }
                 }
             }
 
@@ -77,10 +101,10 @@ impl Equation {
             for x in 0..operations.len() {
                 match operations[x] {
                     Operation::Add(_) => {
-                        operations[x] = operations[x].next();
+                        operations[x] = operations[x].next(concat);
                         value_added = true;
                     }
-                    Operation::Multiply(_) => operations[x] = operations[x].next(),
+                    _ => operations[x] = operations[x].next(concat),
                 }
 
                 if value_added {
@@ -99,8 +123,8 @@ fn parse_contents(content: &str) -> Vec<Equation> {
 fn all_multiply(operations: &[Operation]) -> bool {
     for o in operations.iter() {
         match o {
-            Operation::Add(_) => return false,
             Operation::Multiply(_) => (),
+            _ => return false,
         }
     }
 
