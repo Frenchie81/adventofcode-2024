@@ -1,6 +1,6 @@
 use std::{env, fs, path::Path};
 
-use day9::puzzle1::solve_day9_puzzle1;
+use day9::puzzle2::solve_day9_puzzle2;
 
 pub mod day1;
 pub mod day2;
@@ -23,6 +23,6 @@ fn read_file(file_name: &str) -> String {
 fn main() {
     dotenvy::dotenv().expect("should be able to load .env file!");
 
-    let result = solve_day9_puzzle1();
+    let result = solve_day9_puzzle2();
     println!("{result}");
 }
