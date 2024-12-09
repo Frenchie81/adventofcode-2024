@@ -115,6 +115,63 @@ impl Map {
         }
     }
 
+    fn apply_frequencies_with_resonance(&mut self) {
+        for (k, v) in self.frequencies.iter() {
+            let positions_len = v.positions.len();
+            for (i, pos1) in v.positions.iter().enumerate() {
+                if let Some((tower_x, tower_y)) = self.get_tile(pos1) {
+                    self.grid[tower_x][tower_y].antinodes.push(*k);
+                }
+                for j in i + 1..positions_len {
+                    let pos2 = v.positions[j];
+                    let diff = pos1.difference(pos2);
+
+                    let mut pos1_x = pos1.x;
+                    let mut pos1_y = pos1.y;
+                    let mut pos2_x = pos2.x;
+                    let mut pos2_y = pos2.y;
+
+                    loop {
+                        let mut continue_antinode_1 = true;
+                        let mut continue_antinode_2 = true;
+
+                        if continue_antinode_1 {
+                            pos1_x += diff.x;
+                            pos1_y += diff.y;
+                            let antinode1 = Pos {
+                                x: pos1_x,
+                                y: pos1_y,
+                            };
+                            if let Some((tile_x, tile_y)) = self.get_tile(&antinode1) {
+                                self.grid[tile_x][tile_y].antinodes.push(*k);
+                            } else {
+                                continue_antinode_1 = false;
+                            }
+                        }
+
+                        if continue_antinode_2 {
+                            pos2_x -= diff.x;
+                            pos2_y -= diff.y;
+                            let antinode2 = Pos {
+                                x: pos2_x,
+                                y: pos2_y,
+                            };
+                            if let Some((tile_x, tile_y)) = self.get_tile(&antinode2) {
+                                self.grid[tile_x][tile_y].antinodes.push(*k);
+                            } else {
+                                continue_antinode_2 = false;
+                            }
+                        }
+
+                        if !continue_antinode_1 && !continue_antinode_2 {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn get_tile(&self, pos: &Pos) -> Option<(usize, usize)> {
         if pos.x < 0 || pos.y < 0 {
             return None;
