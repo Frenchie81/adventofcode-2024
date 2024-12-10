@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 pub mod puzzle1;
 pub mod puzzle2;
@@ -36,19 +36,22 @@ impl Map {
         Map { grid }
     }
 
-    fn get_map_total(&self) -> i64 {
-        let mut sum = 0;
+    fn get_map_total(&self) -> (i64, i64) {
+        let mut score_sum = 0;
+        let mut rating_sum = 0;
         for (x, row) in self.grid.iter().enumerate() {
             for (y, val) in row.iter().enumerate() {
                 if *val == 0 {
-                    sum += self.get_trailhead_score(Pos {
+                    let (sum, visited_nines) = self.get_trailhead_score(Pos {
                         x: x as i64,
                         y: y as i64,
                     });
+                    score_sum += sum;
+                    rating_sum += visited_nines.values().sum::<i64>();
                 }
             }
         }
-        sum
+        (score_sum, rating_sum)
     }
 
     fn get_value(&self, pos: &Pos) -> i64 {
@@ -61,13 +64,13 @@ impl Map {
         -1
     }
 
-    fn get_trailhead_score(&self, starting_pos: Pos) -> i64 {
-        let mut visited_nines = HashSet::new();
+    fn get_trailhead_score(&self, starting_pos: Pos) -> (i64, HashMap<Pos, i64>) {
+        let mut visited_nines = HashMap::new();
         self.recurse_path(&starting_pos, &mut visited_nines);
-        visited_nines.len() as i64
+        (visited_nines.len() as i64, visited_nines)
     }
 
-    fn recurse_path(&self, current_pos: &Pos, visited_nines: &mut HashSet<Pos>) {
+    fn recurse_path(&self, current_pos: &Pos, visited_nines: &mut HashMap<Pos, i64>) {
         let current_value = self.get_value(current_pos);
 
         let directions = [
@@ -110,7 +113,13 @@ impl Map {
             }
 
             if next_value == 9 {
-                visited_nines.insert(next_pos);
+                if let std::collections::hash_map::Entry::Vacant(e) = visited_nines.entry(next_pos)
+                {
+                    e.insert(1);
+                } else {
+                    let entry = visited_nines.get_mut(&next_pos).unwrap();
+                    *entry += 1;
+                }
                 continue;
             }
 

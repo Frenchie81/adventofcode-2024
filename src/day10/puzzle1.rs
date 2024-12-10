@@ -8,7 +8,7 @@ pub fn solve_day10_puzzle1() -> i64 {
 
 fn get_result(content: &str) -> i64 {
     let map = Map::parse(content);
-    map.get_map_total()
+    map.get_map_total().0
 }
 
 #[cfg(test)]
