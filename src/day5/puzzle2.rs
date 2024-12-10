@@ -9,7 +9,7 @@ pub fn solve_day5_puzzle2() -> i64 {
     get_result(content.as_str())
 }
 
-pub fn get_result(content: &str) -> i64 {
+fn get_result(content: &str) -> i64 {
     let (rules, sections) = parse_content(content);
 
     let mut sum = 0;
