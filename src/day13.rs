@@ -1,18 +1,39 @@
-use std::ops::Add;
+use core::f64;
+use std::{ops::Add, sync::mpsc::channel};
+
+use rayon::prelude::*;
 
 use crate::read_file;
 
 pub fn solve_puzzle_1() -> i64 {
-    get_result(&read_file("day13.txt"))
+    get_result(&read_file("day13.txt"), 0)
 }
 
-fn get_result(content: &str) -> i64 {
+pub fn solve_puzzle_2() -> i64 {
+    get_result(&read_file("day13.txt"), 10000000000000)
+}
+fn get_result(content: &str, additional_target_distance: i64) -> i64 {
     let games = parse_content(content);
-    let mut result = 0;
-    for game in games {
-        result += game.find_cheapest_result().unwrap_or_default();
-    }
-    result
+
+    let (s, r) = channel();
+
+    games.into_par_iter().for_each_with(s, |s, g| {
+        println!("starting: {:?}", g.prize);
+        let r = g
+            .find_cheapest_result(additional_target_distance)
+            .unwrap_or_default();
+        println!("result: {r}");
+        s.send(r);
+    });
+
+    let mut res: Vec<i64> = r.iter().collect();
+
+    // for game in games {
+    //     result += game
+    //         .find_cheapest_result(additional_target_distance)
+    //         .unwrap_or_default();
+    // }
+    res.iter().sum()
 }
 
 fn parse_content(content: &str) -> Vec<Game> {
@@ -94,47 +115,90 @@ impl Game {
         }
     }
 
-    fn find_cheapest_result(&self) -> Option<i64> {
+    fn find_cheapest_result(&self, additional_target_distance: i64) -> Option<i64> {
         const A_COST: i64 = 3;
         const B_COST: i64 = 1;
 
-        let mut a_table: Vec<Pos> = Vec::new();
-        let mut b_table: Vec<Pos> = Vec::new();
+        let prize = self.prize
+            + Pos {
+                x: additional_target_distance,
+                y: additional_target_distance,
+            };
 
-        (1..101).for_each(|i| {
-            a_table.push(Pos {
-                x: self.button_a.x * i,
-                y: self.button_a.y * i,
-            })
-        });
+        let max_b_x_presses = prize.x / self.button_b.x;
+        let max_b_y_presses = prize.y / self.button_b.y;
 
-        (1..101).for_each(|i| {
-            b_table.push(Pos {
-                x: self.button_b.x * i,
-                y: self.button_b.y * i,
-            })
-        });
+        let max_b_presses = if max_b_y_presses > max_b_x_presses {
+            max_b_y_presses
+        } else {
+            max_b_x_presses
+        };
 
-        for (b, b_press) in b_table
-            .iter()
-            .filter(|b| b.x <= self.prize.x && b.y <= self.prize.y)
-            .enumerate()
-        {
-            for (a, a_press) in a_table
-                .iter()
-                .filter(|a| a.x <= self.prize.x && a.y <= self.prize.y)
-                .enumerate()
-            {
-                if *a_press + *b_press == self.prize {
-                    let a_total = (a as i64 + 1) * A_COST;
-                    let b_total = (b as i64 + 1) * B_COST;
-
-                    return Some(a_total + b_total);
+        for b_presses in (1..max_b_presses).rev() {
+            let b_val = self.button_b.x * b_presses;
+            let a_val = (prize.x - b_val) as f64 / self.button_a.x as f64;
+            if a_val.fract() == 0.0 {
+                let answer_x = (self.button_a.x * a_val as i64) + (self.button_b.x * b_presses);
+                let answer_y = (self.button_a.y * a_val as i64) + (self.button_b.y * b_presses);
+                if answer_x == prize.x && answer_y == prize.y {
+                    return Some(b_presses * B_COST + a_val as i64 * A_COST);
                 }
             }
         }
 
+        // a*94 + b*22 = 8400
+
+        // let b_table = ButtonPossibility {
+        //     iteration: 0,
+        //     base_pos: self.button_b,
+        //     max_pos: prize,
+        //     modifier: 10000000000000,
+        // };
+        //
+        // for (b, b_press) in b_table.enumerate() {
+        //     let a_table = ButtonPossibility {
+        //         iteration: 0,
+        //         base_pos: self.button_a,
+        //         max_pos: prize,
+        //         modifier: 10000000000000,
+        //     };
+        //
+        //     for (a, a_press) in a_table.enumerate() {
+        //         if a_press + b_press == prize {
+        //             let a_total = (a as i64) * A_COST;
+        //             let b_total = (b as i64) * B_COST;
+        //
+        //             return Some(a_total + b_total);
+        //         }
+        //     }
+        // }
+
         None
+    }
+}
+
+#[derive(Copy, Clone)]
+struct ButtonPossibility {
+    iteration: i64,
+    base_pos: Pos,
+    max_pos: Pos,
+    modifier: i64,
+}
+
+impl Iterator for ButtonPossibility {
+    type Item = Pos;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = Pos {
+            x: self.base_pos.x * self.iteration,
+            y: self.base_pos.y * self.iteration,
+        };
+        if next.x > self.max_pos.x && next.y > self.max_pos.y {
+            None
+        } else {
+            self.iteration += self.modifier;
+            Some(next)
+        }
     }
 }
 
@@ -161,7 +225,7 @@ Button A: X+69, Y+23
 Button B: X+27, Y+71
 Prize: X=18641, Y=10279";
 
-        let result = get_result(content);
+        let result = get_result(content, 0);
 
         assert_eq!(480, result);
     }

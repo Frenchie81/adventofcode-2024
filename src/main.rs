@@ -25,6 +25,6 @@ fn read_file(file_name: &str) -> String {
 fn main() {
     dotenvy::dotenv().expect("should be able to load .env file!");
 
-    let result = day13::solve_puzzle_1();
+    let result = day13::solve_puzzle_2();
     println!("result: {result:?}");
 }
