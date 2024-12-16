@@ -5,15 +5,13 @@ use crate::read_file;
 pub fn solve_puzzle_1() -> i64 {
     let content = read_file("day14.txt");
     let mut grid = Grid::parse(&content, 101, 103);
-    get_result(&mut grid)
+    get_result(&mut grid, 100)
 }
 
-fn get_result(grid: &mut Grid) -> i64 {
+fn get_result(grid: &mut Grid, ticks: i64) -> i64 {
     grid.render();
-    grid.run(100);
-    println!();
-    grid.render();
-    0
+    grid.run(ticks);
+    grid.solve()
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -47,12 +45,12 @@ impl Mul for Pos {
 impl Pos {
     fn parse(line: &str) -> Self {
         let splits: Vec<&str> = line.split(',').collect();
-        let y = splits
+        let x = splits
             .first()
             .expect("should always be two parts")
             .parse()
             .expect("should always be a number");
-        let x = splits
+        let y = splits
             .get(1)
             .expect("should always be two parts")
             .parse()
@@ -103,8 +101,8 @@ impl Grid {
     }
 
     fn render(&self) {
-        (0..self.max_y).for_each(|x| {
-            (0..self.max_x).for_each(|y| {
+        (0..self.max_y).for_each(|y| {
+            (0..self.max_x).for_each(|x| {
                 let robot_count = self
                     .robots
                     .iter()
@@ -126,21 +124,66 @@ impl Grid {
             robot.pos = robot.pos + (Pos { x: ticks, y: ticks } * robot.velocity);
 
             if robot.pos.x < 0 {
-                robot.pos.x = robot.pos.x.abs();
+                robot.pos.x %= -self.max_x;
+                robot.pos.x += self.max_x;
             }
-
-            if robot.pos.y < 0 {
-                robot.pos.y = robot.pos.y.abs();
-            }
-
             if robot.pos.x > self.max_x {
                 robot.pos.x %= self.max_x;
             }
 
+            if robot.pos.y < 0 {
+                robot.pos.y %= -self.max_y;
+                robot.pos.y += self.max_y;
+            }
             if robot.pos.y > self.max_y {
                 robot.pos.y %= self.max_y;
             }
+
+            if robot.pos.x == self.max_x {
+                robot.pos.x -= self.max_x;
+            }
+
+            if robot.pos.y == self.max_y {
+                robot.pos.y -= self.max_y;
+            }
         }
+    }
+
+    fn solve(&self) -> i64 {
+        let x_divider = (self.max_x - 1) / 2;
+        let y_divider = (self.max_y - 1) / 2;
+        let mut quad1 = 0;
+        let mut quad2 = 0;
+        let mut quad3 = 0;
+        let mut quad4 = 0;
+
+        for robot in self.robots.iter() {
+            if robot.pos.x == x_divider {
+                continue;
+            }
+
+            if robot.pos.y == y_divider {
+                continue;
+            }
+
+            if robot.pos.x < x_divider && robot.pos.y < y_divider {
+                quad1 += 1;
+            }
+
+            if robot.pos.x > x_divider && robot.pos.y < y_divider {
+                quad2 += 1;
+            }
+
+            if robot.pos.x < x_divider && robot.pos.y > y_divider {
+                quad3 += 1;
+            }
+
+            if robot.pos.x > x_divider && robot.pos.y > y_divider {
+                quad4 += 1;
+            }
+        }
+
+        quad1 * quad2 * quad3 * quad4
     }
 }
 
@@ -164,27 +207,17 @@ p=7,3 v=-1,2
 p=2,4 v=2,-3
 p=9,5 v=-3,-3";
 
-        let result = get_result(&mut Grid::parse(content, 11, 7));
+        let result = get_result(&mut Grid::parse(content, 11, 7), 100);
 
         assert_eq!(12, result);
     }
 
     #[test]
-    fn temp() {
-        let robot = Robot {
-            pos: Pos { x: 0, y: 0 },
-            velocity: Pos { x: 2, y: 1 },
-        };
+    fn file() {
+        dotenvy::dotenv().expect("should be able to load .env file!");
 
-        let ticks = 3;
-        let next_x_pos = robot.pos.x + (robot.velocity.x * ticks);
-        let next_y_pos = robot.pos.y + (robot.velocity.y * ticks);
+        let result = solve_puzzle_1();
 
-        let new_pos = Pos {
-            x: next_x_pos,
-            y: next_y_pos,
-        };
-
-        println!("{new_pos:?}");
+        assert_eq!(229868730, result);
     }
 }
