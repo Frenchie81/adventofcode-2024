@@ -1,5 +1,7 @@
 use std::{collections::HashSet, os::unix::thread, time::Duration};
 
+use chrono::Utc;
+
 use crate::read_file;
 
 pub fn solve_puzzle_1() -> i64 {
@@ -156,7 +158,8 @@ fn recurse(
     // std::thread::sleep(Duration::from_millis(500));
 
     if *tile == 'E' {
-        println!("win! {current_score}");
+        let now = Utc::now();
+        println!("{now} win! {current_score}");
         scores.insert(current_score);
         return;
     }
