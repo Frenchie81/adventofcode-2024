@@ -5,14 +5,33 @@ pub fn solve_puzzle_1() -> String {
     get_result(&content)
 }
 
+pub fn solve_puzzle_2() -> i64 {
+    let content = read_file("day17.txt");
+    get_result2(&content)
+}
+
 fn get_result(content: &str) -> String {
     let (mut computer, program) = parse_content(content);
     let result: Vec<String> = computer
-        .execute(program)
+        .execute(&program)
         .iter()
         .map(|i| i.to_string())
         .collect();
     result.join(",")
+}
+
+fn get_result2(content: &str) -> i64 {
+    let (computer, program) = parse_content(content);
+    let mut output: Vec<i64> = Vec::new();
+    let mut reg_a = 0;
+    while output != program {
+        reg_a += 1;
+        let mut copy = computer;
+        copy.a = reg_a;
+        output = copy.execute(&program);
+    }
+
+    reg_a
 }
 
 fn parse_content(content: &str) -> (Computer, Vec<i64>) {
@@ -48,6 +67,7 @@ fn parse_content(content: &str) -> (Computer, Vec<i64>) {
     (computer, program)
 }
 
+#[derive(Debug, Copy, Clone)]
 struct Computer {
     a: i64,
     b: i64,
@@ -55,7 +75,7 @@ struct Computer {
 }
 
 impl Computer {
-    fn execute(&mut self, instructions: Vec<i64>) -> Vec<i64> {
+    fn execute(&mut self, instructions: &Vec<i64>) -> Vec<i64> {
         let mut output = Vec::new();
         let mut p = 0; // instruction pointer
         while p < instructions.len() {
@@ -148,6 +168,19 @@ Program: 0,1,5,4,3,0";
         let result = get_result(content);
 
         assert_eq!("4,6,3,5,6,3,5,2,1,0", result)
+    }
+
+    #[test]
+    fn demo2() {
+        let content = "Register A: 2024
+Register B: 0
+Register C: 0
+
+Program: 0,3,5,4,3,0";
+
+        let result = get_result2(content);
+
+        assert_eq!(117440, result)
     }
 
     #[test]
