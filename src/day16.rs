@@ -1,8 +1,10 @@
-use std::collections::HashSet;
-
-use chrono::Utc;
-
 use crate::read_file;
+use std::{
+    collections::HashSet,
+    fmt::{format, Display},
+    hash::Hash,
+    time::Duration,
+};
 
 pub fn solve_puzzle_1() -> i64 {
     let content = read_file("day16.txt");
@@ -10,9 +12,27 @@ pub fn solve_puzzle_1() -> i64 {
 }
 
 fn get_result(content: &str) -> i64 {
-    let mut grid = parse_maze(content);
+    let grid = parse_maze(content);
+
     let start = find_start(&grid).expect("there should always be a start tile");
-    solve_maze(&mut grid, start)
+    let starting_bot = Robot {
+        pos: start,
+        score: 0,
+        direction: Direction::East,
+        memory: HashSet::new(),
+        finished: false,
+        blocked: false,
+        path: HashSet::new(),
+    };
+
+    let mut maze = Maze {
+        grid,
+        robots: vec![starting_bot],
+        visited: HashSet::new(),
+    };
+
+    maze.run();
+    maze.get_lowest_score()
 }
 
 fn parse_maze(content: &str) -> Grid {
@@ -27,25 +47,6 @@ fn parse_maze(content: &str) -> Grid {
     grid
 }
 
-fn render_grid(grid: &Grid, current_pos: &Pos, direction: &Direction) {
-    for (y, row) in grid.iter().enumerate() {
-        for (x, c) in row.iter().enumerate() {
-            if current_pos.x == x && current_pos.y == y {
-                let d = match direction {
-                    Direction::North => '^',
-                    Direction::East => '>',
-                    Direction::South => 'v',
-                    Direction::West => '<',
-                };
-                print!("{d}");
-            } else {
-                print!("{c}");
-            }
-        }
-        println!();
-    }
-}
-
 fn find_start(grid: &Grid) -> Option<Pos> {
     for (y, row) in grid.iter().enumerate() {
         for (x, c) in row.iter().enumerate() {
@@ -58,7 +59,12 @@ fn find_start(grid: &Grid) -> Option<Pos> {
     None
 }
 
-fn next_open_pos(grid: &Grid, current_pos: &Pos, direction: &Direction) -> Option<Pos> {
+fn next_open_pos(
+    grid: &Grid,
+    current_pos: &Pos,
+    direction: &Direction,
+    memory: &HashSet<Pos>,
+) -> Option<Pos> {
     let max_y = grid.len();
     let max_x = grid.first().expect("should always be one row").len();
 
@@ -96,113 +102,16 @@ fn next_open_pos(grid: &Grid, current_pos: &Pos, direction: &Direction) -> Optio
     pos?;
     let pos = pos.unwrap();
 
+    if memory.contains(&pos) {
+        return None;
+    }
+
     let c = grid[pos.y][pos.x];
     if c == '#' {
         return None;
     }
 
     Some(pos)
-}
-
-fn solve_maze(grid: &mut Grid, starting_pos: Pos) -> i64 {
-    let mut visited = HashSet::new();
-    let mut scores = HashSet::new();
-
-    render_grid(grid, &starting_pos, &Direction::East);
-
-    recurse(
-        grid,
-        &starting_pos,
-        Direction::East,
-        &mut visited,
-        0,
-        &mut scores,
-    );
-
-    *scores
-        .iter()
-        .min()
-        .expect("there should always be at least one score")
-}
-
-fn recurse(
-    grid: &mut Grid,
-    pos: &Pos,
-    direction: Direction,
-    visited: &mut HashSet<Pos>,
-    current_score: i64,
-    scores: &mut HashSet<i64>,
-) {
-    let row = grid.get(pos.y);
-    if row.is_none() {
-        return;
-    }
-    let row = row.unwrap();
-
-    let tile = row.get(pos.x);
-    if tile.is_none() {
-        return;
-    }
-    let tile = tile.unwrap();
-
-    // println!("{pos:?}");
-    // println!("{scores:?}");
-    // std::thread::sleep(Duration::from_millis(10));
-    if visited.contains(pos) {
-        return;
-    }
-
-    visited.insert(*pos);
-
-    // render_grid(grid, pos, &direction);
-    // std::thread::sleep(Duration::from_millis(500));
-
-    if *tile == 'E' {
-        let now = Utc::now();
-        println!("{now} win! {current_score}");
-        scores.insert(current_score);
-        return;
-    }
-
-    // try to move
-    if let Some(next_pos) = next_open_pos(grid, pos, &direction) {
-        recurse(
-            grid,
-            &next_pos,
-            direction,
-            &mut visited.clone(),
-            current_score + 1,
-            scores,
-        );
-    }
-
-    // turn left
-    let left = direction.turn_left();
-    if let Some(next_pos) = next_open_pos(grid, pos, &left) {
-        recurse(
-            grid,
-            &next_pos,
-            left,
-            // &mut visited.clone(),
-            visited,
-            current_score + 1000 + 1,
-            scores,
-        );
-    }
-
-    // turn right
-    let right = direction.turn_right();
-    if let Some(next_pos) = next_open_pos(grid, pos, &direction.turn_right()) {
-        recurse(
-            grid,
-            &next_pos,
-            right,
-            visited,
-            // &mut visited.clone(),
-            current_score + 1000 + 1,
-            scores,
-        );
-    }
 }
 
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
@@ -214,6 +123,168 @@ struct Pos {
 impl Pos {
     fn new(x: usize, y: usize) -> Self {
         Self { x, y }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Robot {
+    pos: Pos,
+    direction: Direction,
+    memory: HashSet<Pos>,
+    score: i64,
+    blocked: bool,
+    finished: bool,
+    path: HashSet<Pos>,
+}
+
+impl Display for Robot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Robot Pos: {:?}, Blocked: {}, Finished: {}, score: {}",
+            self.pos, self.blocked, self.finished, self.score
+        )
+    }
+}
+
+struct Maze {
+    grid: Grid,
+    robots: Vec<Robot>,
+    visited: HashSet<Pos>,
+}
+
+impl Maze {
+    fn render_winner(&self) {
+        let low_score = self.get_lowest_score();
+        if low_score < 0 {
+            return;
+        }
+
+        let winners: Vec<&Robot> = self
+            .robots
+            .iter()
+            .filter(|r| r.score == low_score)
+            .collect();
+
+        for (y, row) in self.grid.iter().enumerate() {
+            for (x, tile) in row.iter().enumerate() {
+                let mut c = *tile;
+                let pos = Pos { x, y };
+                for (i, r) in winners.iter().enumerate() {
+                    if r.path.contains(&pos) {
+                        c = *i
+                            .to_string()
+                            .chars()
+                            .collect::<Vec<char>>()
+                            .first()
+                            .unwrap();
+                    }
+                }
+                print!("{c}");
+            }
+            println!();
+        }
+        self.robots.iter().for_each(|r| {
+            println!("{r}");
+        });
+    }
+
+    fn render(&self) {
+        for (y, row) in self.grid.iter().enumerate() {
+            for (x, tile) in row.iter().enumerate() {
+                let mut c = *tile;
+                let pos = Pos { x, y };
+                if self.visited.contains(&pos) {
+                    c = 'O';
+                }
+                if let Some(robot) = self.robots.iter().find(|r| r.pos.x == x && r.pos.y == y) {
+                    c = match robot.direction {
+                        Direction::North => '^',
+                        Direction::East => '>',
+                        Direction::South => 'v',
+                        Direction::West => '<',
+                    }
+                }
+                print!("{c}");
+            }
+            println!();
+        }
+        self.robots.iter().for_each(|r| {
+            println!("{r}");
+        });
+    }
+
+    fn run(&mut self) {
+        while self.robots.iter().any(|r| !(r.finished)) {
+            self.tick();
+            // remove any blocked robots
+            self.robots.retain(|r| !r.blocked);
+            // self.render();
+            // std::thread::sleep(Duration::from_millis(1000));
+        }
+
+        self.render_winner();
+    }
+
+    fn tick(&mut self) {
+        let mut spawns = Vec::new();
+        for robot in self.robots.iter_mut().filter(|r| !r.finished && !r.blocked) {
+            // set the robots memory to start
+            robot.memory.insert(robot.pos);
+            self.visited.insert(robot.pos);
+
+            let left_direction = robot.direction.turn_left();
+            let left_pos = next_open_pos(&self.grid, &robot.pos, &left_direction, &robot.memory);
+            if left_pos.is_some() {
+                let mut new_robot = robot.clone();
+                new_robot.direction = left_direction;
+                new_robot.score += 1000;
+                spawns.push(new_robot);
+            }
+
+            let right_direction = robot.direction.turn_right();
+            let right_pos = next_open_pos(&self.grid, &robot.pos, &right_direction, &robot.memory);
+            if right_pos.is_some() {
+                let mut new_robot = robot.clone();
+                new_robot.direction = right_direction;
+                new_robot.score += 1000;
+                spawns.push(new_robot);
+            }
+
+            if let Some(next_pos) =
+                next_open_pos(&self.grid, &robot.pos, &robot.direction, &robot.memory)
+            {
+                let tile = self.grid[next_pos.y][next_pos.x];
+                robot.score += 1;
+                if tile == 'E' {
+                    robot.finished = true;
+                } else {
+                    robot.path.insert(next_pos);
+                    robot.pos = next_pos;
+                    for spawn in spawns.iter_mut() {
+                        spawn.memory.insert(next_pos);
+                    }
+                }
+            } else {
+                robot.blocked = true;
+            }
+        }
+
+        for spawn in spawns {
+            self.robots.push(spawn);
+        }
+    }
+
+    fn get_lowest_score(&self) -> i64 {
+        let mut lowest_score = -1;
+
+        for r in self.robots.iter().filter(|r| r.finished) {
+            if lowest_score == -1 || r.score < lowest_score {
+                lowest_score = r.score;
+            }
+        }
+
+        lowest_score
     }
 }
 
@@ -252,7 +323,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn demo() {
+    fn demo1() {
         let content = "\
 ###############
 #.......#....E#
