@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
-    hash::Hash,
 };
 
 use crate::read_file;
@@ -11,13 +10,34 @@ pub fn solve_puzzle_1() -> i64 {
     get_result(&content, 71, 1024)
 }
 
+pub fn solve_puzzle_2() -> String {
+    let content = read_file("day18.txt");
+    get_result2(&content, 71)
+}
+
 fn get_result(content: &str, grid_size: usize, num_bytes: usize) -> i64 {
     let mut corrupted_pos_list = parse_content(content);
     corrupted_pos_list.truncate(num_bytes);
     let grid = generate_grid(grid_size, &corrupted_pos_list);
-    render_grid(&grid);
 
     find_lowest_cost(&grid, grid_size)
+}
+
+fn get_result2(content: &str, grid_size: usize) -> String {
+    let corrupted_pos_list = parse_content(content);
+    for x in 1025..corrupted_pos_list.len() {
+        let mut list_to_use = corrupted_pos_list.clone();
+        list_to_use.truncate(x);
+        let grid = generate_grid(grid_size, &list_to_use);
+
+        let lowest_cost = find_lowest_cost(&grid, grid_size);
+
+        if lowest_cost < 1 {
+            let last_pos = list_to_use.last().unwrap();
+            return format!("{},{}", last_pos.x, last_pos.y);
+        }
+    }
+    "".to_string()
 }
 
 fn parse_content(content: &str) -> Vec<Pos> {
@@ -60,15 +80,6 @@ fn generate_grid(grid_size: usize, corrupted_pos_list: &[Pos]) -> Grid {
     grid
 }
 
-fn render_grid(grid: &Grid) {
-    for row in grid.iter() {
-        for tile in row.iter() {
-            print!("{}", tile.tile_type);
-        }
-        println!();
-    }
-}
-
 fn find_lowest_cost(grid: &Grid, grid_size: usize) -> i64 {
     let start_pos = Pos::new(0, 0);
     let end_pos = Pos::new(grid_size - 1, grid_size - 1);
@@ -108,12 +119,7 @@ fn find_lowest_cost(grid: &Grid, grid_size: usize) -> i64 {
 
             match neighbor.tile_type {
                 TileType::Open => {
-                    update_visit_entry(
-                        &mut visit_list,
-                        neighbor.pos,
-                        visit.pos,
-                        visit.cost_from_start + 1,
-                    );
+                    update_visit_entry(&mut visit_list, neighbor.pos, visit.cost_from_start + 1);
                     visit_queue.add(Visit::new(neighbor.pos, visit.cost_from_start + 1))
                 }
                 TileType::Corrupted => (),
@@ -130,12 +136,7 @@ fn find_lowest_cost(grid: &Grid, grid_size: usize) -> i64 {
     }
 }
 
-fn update_visit_entry(
-    visits: &mut HashMap<Pos, VisitEntry>,
-    pos: Pos,
-    from: Pos,
-    cost_from_start: i64,
-) {
+fn update_visit_entry(visits: &mut HashMap<Pos, VisitEntry>, pos: Pos, cost_from_start: i64) {
     visits
         .entry(pos)
         .and_modify(|v| {
@@ -144,8 +145,6 @@ fn update_visit_entry(
             }
         })
         .or_insert(VisitEntry {
-            pos,
-            from,
             min_cost: cost_from_start,
         });
 }
@@ -166,9 +165,7 @@ impl Visit {
 }
 
 struct VisitEntry {
-    pos: Pos,
     min_cost: i64,
-    from: Pos,
 }
 
 struct PriorityQueue {
@@ -268,7 +265,9 @@ mod tests {
         dotenvy::dotenv().expect("should be able to load .env file!");
 
         let result = solve_puzzle_1();
+        let result2 = solve_puzzle_2();
 
         assert_eq!(292, result);
+        assert_eq!("58,44", result2);
     }
 }
