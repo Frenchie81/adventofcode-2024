@@ -1,9 +1,7 @@
 use crate::read_file;
 use std::{
-    collections::HashSet,
-    fmt::{format, Display},
-    hash::Hash,
-    time::Duration,
+    collections::{HashMap, HashSet},
+    fmt::Display,
 };
 
 pub fn solve_puzzle_1() -> i64 {
@@ -12,283 +10,223 @@ pub fn solve_puzzle_1() -> i64 {
 }
 
 fn get_result(content: &str) -> i64 {
-    let grid = parse_maze(content);
-
-    let start = find_start(&grid).expect("there should always be a start tile");
-    let starting_bot = Robot {
-        pos: start,
-        score: 0,
+    let (grid, start_pos, end_pos) = parse_content(content);
+    let mut visit_results: HashMap<Pos, VisitResult> = HashMap::new();
+    let mut visit_queue = PriorityQueue::new();
+    let mut visited = HashSet::new();
+    visit_queue.add(Visit {
+        pos: start_pos,
         direction: Direction::East,
-        memory: HashSet::new(),
-        finished: false,
-        blocked: false,
-        path: HashSet::new(),
-    };
+        cost_from_start: 0,
+    });
+    while let Some(visit) = visit_queue.dequeue() {
+        if let Some(forward_tile) = try_get_next_tile(&grid, &visit.pos, &visit.direction) {
+            let new_cost = visit.cost_from_start + 1;
+            update_visit_result(&mut visit_results, &forward_tile.pos, &visit.pos, new_cost);
+            if !visited.contains(&forward_tile.pos) {
+                visit_queue.add(Visit {
+                    cost_from_start: new_cost,
+                    pos: forward_tile.pos,
+                    direction: visit.direction,
+                });
+            }
+        }
 
-    let mut maze = Maze {
-        grid,
-        robots: vec![starting_bot],
-        visited: HashSet::new(),
-    };
+        let left = visit.direction.turn_left();
+        if let Some(left_tile) = try_get_next_tile(&grid, &visit.pos, &visit.direction.turn_left())
+        {
+            let new_cost = visit.cost_from_start + 1001;
+            update_visit_result(&mut visit_results, &left_tile.pos, &visit.pos, new_cost);
+            if !visited.contains(&left_tile.pos) {
+                visit_queue.add(Visit {
+                    cost_from_start: new_cost,
+                    pos: left_tile.pos,
+                    direction: left,
+                });
+            }
+        }
 
-    maze.run();
-    maze.get_lowest_score()
+        let right = visit.direction.turn_right();
+        if let Some(right_tile) =
+            try_get_next_tile(&grid, &visit.pos, &visit.direction.turn_right())
+        {
+            let new_cost = visit.cost_from_start + 1001;
+            update_visit_result(&mut visit_results, &right_tile.pos, &visit.pos, new_cost);
+            if !visited.contains(&right_tile.pos) {
+                visit_queue.add(Visit {
+                    cost_from_start: new_cost,
+                    pos: right_tile.pos,
+                    direction: right,
+                });
+            }
+        }
+
+        visited.insert(visit.pos);
+    }
+
+    if let Some(end_visit) = visit_results.get(&end_pos) {
+        end_visit.min_cost
+    } else {
+        0
+    }
 }
 
-fn parse_maze(content: &str) -> Grid {
+fn update_visit_result(
+    visit_results: &mut HashMap<Pos, VisitResult>,
+    pos: &Pos,
+    from: &Pos,
+    cost: i64,
+) {
+    visit_results
+        .entry(*pos)
+        .and_modify(|v| {
+            if v.min_cost > cost {
+                v.min_cost = cost;
+                v.from = *from;
+            }
+        })
+        .or_insert(VisitResult {
+            from: *from,
+            min_cost: cost,
+        });
+}
+
+fn parse_content(content: &str) -> (Grid, Pos, Pos) {
     let mut grid = Grid::new();
-    for line in content.lines() {
+    let mut start_pos: Option<Pos> = None;
+    let mut end_pos: Option<Pos> = None;
+    for (y, line) in content.lines().enumerate() {
         let mut row = Vec::new();
-        for c in line.chars() {
-            row.push(c);
+        for (x, c) in line.chars().enumerate() {
+            let tile_type = match c {
+                '#' => TileType::Wall,
+                'S' => {
+                    start_pos = Some(Pos { x, y });
+                    TileType::Start
+                }
+                'E' => {
+                    end_pos = Some(Pos { x, y });
+                    TileType::End
+                }
+                _ => TileType::Open,
+            };
+            row.push(Tile {
+                tile_type,
+                pos: Pos { x, y },
+            });
         }
         grid.push(row);
     }
-    grid
+    (grid, start_pos.unwrap(), end_pos.unwrap())
 }
 
-fn find_start(grid: &Grid) -> Option<Pos> {
-    for (y, row) in grid.iter().enumerate() {
-        for (x, c) in row.iter().enumerate() {
-            if *c == 'S' {
-                return Some(Pos::new(x, y));
-            }
-        }
+#[derive(Debug)]
+struct VisitResult {
+    min_cost: i64,
+    from: Pos,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Visit {
+    pos: Pos,
+    direction: Direction,
+    cost_from_start: i64,
+}
+
+type Grid = Vec<Vec<Tile>>;
+
+struct PriorityQueue {
+    list: Vec<Visit>,
+}
+
+impl PriorityQueue {
+    fn new() -> Self {
+        Self { list: Vec::new() }
     }
 
-    None
+    fn add(&mut self, visit: Visit) {
+        self.list.push(visit);
+        self.list
+            .sort_by(|a, b| b.cost_from_start.cmp(&a.cost_from_start));
+    }
+
+    fn dequeue(&mut self) -> Option<Visit> {
+        self.list.pop()
+    }
 }
 
-fn next_open_pos(
-    grid: &Grid,
-    current_pos: &Pos,
-    direction: &Direction,
-    memory: &HashSet<Pos>,
-) -> Option<Pos> {
-    let max_y = grid.len();
-    let max_x = grid.first().expect("should always be one row").len();
-
-    let pos = match direction {
+fn try_get_next_tile(grid: &Grid, pos: &Pos, direction: &Direction) -> Option<Tile> {
+    let tile = match direction {
         Direction::North => {
-            if current_pos.y == 0 {
-                None
+            if pos.y < 1 {
+                return None;
             } else {
-                Some(Pos::new(current_pos.x, current_pos.y - 1))
+                grid[pos.y - 1][pos.x]
             }
         }
         Direction::East => {
-            if current_pos.x >= max_x {
-                None
+            let row = &grid[pos.y];
+            if pos.x + 1 > row.len() {
+                return None;
             } else {
-                Some(Pos::new(current_pos.x + 1, current_pos.y))
+                row[pos.x + 1]
             }
         }
         Direction::South => {
-            if current_pos.y >= max_y {
-                None
+            if pos.y + 1 > grid.len() {
+                return None;
             } else {
-                Some(Pos::new(current_pos.x, current_pos.y + 1))
+                grid[pos.y + 1][pos.x]
             }
         }
         Direction::West => {
-            if current_pos.x == 0 {
-                None
+            if pos.x < 1 {
+                return None;
             } else {
-                Some(Pos::new(current_pos.x - 1, current_pos.y))
+                grid[pos.y][pos.x - 1]
             }
         }
     };
 
-    pos?;
-    let pos = pos.unwrap();
-
-    if memory.contains(&pos) {
-        return None;
+    match tile.tile_type {
+        TileType::Wall => None,
+        _ => Some(tile),
     }
-
-    let c = grid[pos.y][pos.x];
-    if c == '#' {
-        return None;
-    }
-
-    Some(pos)
 }
 
-#[derive(Hash, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone)]
+struct Tile {
+    tile_type: TileType,
+    pos: Pos,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum TileType {
+    Wall,
+    Start,
+    End,
+    Open,
+}
+
+impl Display for Tile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = match self.tile_type {
+            TileType::Wall => '#',
+            TileType::Start => 'S',
+            TileType::End => 'E',
+            TileType::Open => '.',
+        };
+        write!(f, "{c}")
+    }
+}
+
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 struct Pos {
     x: usize,
     y: usize,
 }
 
-impl Pos {
-    fn new(x: usize, y: usize) -> Self {
-        Self { x, y }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Robot {
-    pos: Pos,
-    direction: Direction,
-    memory: HashSet<Pos>,
-    score: i64,
-    blocked: bool,
-    finished: bool,
-    path: HashSet<Pos>,
-}
-
-impl Display for Robot {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Robot Pos: {:?}, Blocked: {}, Finished: {}, score: {}",
-            self.pos, self.blocked, self.finished, self.score
-        )
-    }
-}
-
-struct Maze {
-    grid: Grid,
-    robots: Vec<Robot>,
-    visited: HashSet<Pos>,
-}
-
-impl Maze {
-    fn render_winner(&self) {
-        let low_score = self.get_lowest_score();
-        if low_score < 0 {
-            return;
-        }
-
-        let winners: Vec<&Robot> = self
-            .robots
-            .iter()
-            .filter(|r| r.score == low_score)
-            .collect();
-
-        for (y, row) in self.grid.iter().enumerate() {
-            for (x, tile) in row.iter().enumerate() {
-                let mut c = *tile;
-                let pos = Pos { x, y };
-                for (i, r) in winners.iter().enumerate() {
-                    if r.path.contains(&pos) {
-                        c = *i
-                            .to_string()
-                            .chars()
-                            .collect::<Vec<char>>()
-                            .first()
-                            .unwrap();
-                    }
-                }
-                print!("{c}");
-            }
-            println!();
-        }
-        self.robots.iter().for_each(|r| {
-            println!("{r}");
-        });
-    }
-
-    fn render(&self) {
-        for (y, row) in self.grid.iter().enumerate() {
-            for (x, tile) in row.iter().enumerate() {
-                let mut c = *tile;
-                let pos = Pos { x, y };
-                if self.visited.contains(&pos) {
-                    c = 'O';
-                }
-                if let Some(robot) = self.robots.iter().find(|r| r.pos.x == x && r.pos.y == y) {
-                    c = match robot.direction {
-                        Direction::North => '^',
-                        Direction::East => '>',
-                        Direction::South => 'v',
-                        Direction::West => '<',
-                    }
-                }
-                print!("{c}");
-            }
-            println!();
-        }
-        self.robots.iter().for_each(|r| {
-            println!("{r}");
-        });
-    }
-
-    fn run(&mut self) {
-        while self.robots.iter().any(|r| !(r.finished)) {
-            self.tick();
-            // remove any blocked robots
-            self.robots.retain(|r| !r.blocked);
-            // self.render();
-            // std::thread::sleep(Duration::from_millis(1000));
-        }
-
-        self.render_winner();
-    }
-
-    fn tick(&mut self) {
-        let mut spawns = Vec::new();
-        for robot in self.robots.iter_mut().filter(|r| !r.finished && !r.blocked) {
-            // set the robots memory to start
-            robot.memory.insert(robot.pos);
-            self.visited.insert(robot.pos);
-
-            let left_direction = robot.direction.turn_left();
-            let left_pos = next_open_pos(&self.grid, &robot.pos, &left_direction, &robot.memory);
-            if left_pos.is_some() {
-                let mut new_robot = robot.clone();
-                new_robot.direction = left_direction;
-                new_robot.score += 1000;
-                spawns.push(new_robot);
-            }
-
-            let right_direction = robot.direction.turn_right();
-            let right_pos = next_open_pos(&self.grid, &robot.pos, &right_direction, &robot.memory);
-            if right_pos.is_some() {
-                let mut new_robot = robot.clone();
-                new_robot.direction = right_direction;
-                new_robot.score += 1000;
-                spawns.push(new_robot);
-            }
-
-            if let Some(next_pos) =
-                next_open_pos(&self.grid, &robot.pos, &robot.direction, &robot.memory)
-            {
-                let tile = self.grid[next_pos.y][next_pos.x];
-                robot.score += 1;
-                if tile == 'E' {
-                    robot.finished = true;
-                } else {
-                    robot.path.insert(next_pos);
-                    robot.pos = next_pos;
-                    for spawn in spawns.iter_mut() {
-                        spawn.memory.insert(next_pos);
-                    }
-                }
-            } else {
-                robot.blocked = true;
-            }
-        }
-
-        for spawn in spawns {
-            self.robots.push(spawn);
-        }
-    }
-
-    fn get_lowest_score(&self) -> i64 {
-        let mut lowest_score = -1;
-
-        for r in self.robots.iter().filter(|r| r.finished) {
-            if lowest_score == -1 || r.score < lowest_score {
-                lowest_score = r.score;
-            }
-        }
-
-        lowest_score
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Copy, Clone, Eq, PartialEq)]
 enum Direction {
     North,
     East,
@@ -315,8 +253,6 @@ impl Direction {
         }
     }
 }
-
-type Grid = Vec<Vec<char>>;
 
 #[cfg(test)]
 mod tests {
@@ -370,5 +306,14 @@ mod tests {
         let result = get_result(content);
 
         assert_eq!(11048, result);
+    }
+
+    #[test]
+    fn file() {
+        dotenvy::dotenv().expect("should be able to load .env file!");
+
+        let result = solve_puzzle_1();
+
+        assert_eq!(99448, result);
     }
 }
